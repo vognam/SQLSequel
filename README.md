@@ -1,3 +1,3 @@
 # SQLSequel
-Conjuctive Query Language
+Conjuctive Query Language \n
 A SQL ripoff
