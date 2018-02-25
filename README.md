@@ -1,0 +1,2 @@
+# SQLSequel
+Conjuctive Query Language
