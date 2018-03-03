@@ -1,5 +1,5 @@
-OUTPUT x1,x2,x3 
-TAKING x1, x2 FROM A 
-AND x3, x4 FROM B 
-AND x5 FROM C 
+OUTPUT x1,x2,x3
+TAKING x1, x2 FROM A.csv
+AND x3, x4 FROM B.csv
+AND x5 FROM C.csv
 WHERE x2 = x3
