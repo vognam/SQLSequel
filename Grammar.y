@@ -39,7 +39,11 @@ EqualProd   : VAR '=' VAR                                 { [(Var $1, Var $3)] }
 
 {
 parseError :: [Token] -> a
-parseError _ = error "Parse Error"
+parseError [] = error ""
+parseError (x:xs) = error ("Parse Error at " ++
+                    "line: " ++ (show (fst (tokenPosn x))) ++
+                    " col: " ++ (show (snd (tokenPosn x))) ++
+                    "\n" ++ (parseError xs))
 
 data Exp = Output Vars Files
          | OutputCond Vars Files Conditions
