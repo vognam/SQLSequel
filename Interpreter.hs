@@ -94,8 +94,16 @@ getDataFromFile (vars, filePath) = getDataFromFile' (toVarList vars) filePath
 
 getDataFromFile' :: [String] -> String -> IO [(String, [String])]
 getDataFromFile' vars filePath = do lines <- getLines filePath
+                                    let valid = checkVarsinCSV vars lines
+                                    if valid then putStr (show valid) else return ()
                                     let zippedData = zip vars [[ x !! index | x <- lines] | index <- [0.. ((length vars) - 1)]]
                                     return zippedData
+
+--check if number of variables in each row of CSV is greater than or equal to variables required to extract from it
+checkVarsinCSV :: [String] -> [[String]] -> Bool
+checkVarsinCSV vars lines = if not (foldr (&&) True [length line >= length vars | line <- lines]) 
+                                      then error "Runtime error: number of variables in CSV do not match number of variables stated"
+                                      else False
                                     
 getLines :: String -> IO [[String]]
 getLines filePath = do
