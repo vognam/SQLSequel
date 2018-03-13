@@ -3,7 +3,6 @@ import Tokens
 import Grammar
 import Data.List.Split
 import Data.List
-import Data.Maybe
 
 --helper functions to remove data constructors
 toVarList :: Vars -> [String]
@@ -25,8 +24,13 @@ main = do programFile <- openFile "Sample Program.txt" ReadMode
 --Interpreter functions (Pattern match AST here)    
 interpret :: Exp -> IO ([[String]])
 interpret (Output vars (File files)) = do 
-                                          let valid = checkOutputVarsUsed (toVarList vars) files
-                                          if valid then putStr ("") else putStr (show valid)
+                                          let outputVarsValid = checkOutputVarsUsed (toVarList vars) files
+                                          if outputVarsValid then putStr ("") else putStr (show outputVarsValid)
+                                          let outputVarsUnique = checkOutputVarsUnique (toVarList vars)
+                                          if outputVarsUnique then putStr ("") else putStr (show outputVarsUnique)
+                                          let varsUnique = checkVarsUnique files
+                                          if varsUnique then putStr ("") else putStr (show varsUnique)
+                                          
                                           dat <- mapM getDataFromFile files --get list of [[var, [column]]] i.e files
                                           let matched = [ matchVars vars d | d <- dat]
                                           let ordered = [ orderByRow m | m <- matched, m /= [] ]
@@ -34,10 +38,50 @@ interpret (Output vars (File files)) = do
                                           let swapped = swap (toVarList vars) (fst perm) (snd perm)
                                           let sorted = sort swapped
                                           return sorted
-                                   
---Data Processing functions (e.g lexographical order etc)
+
+interpret (OutputCond vars (File files) (Equal conds)) = do 
+                                            let outputVarsValid = checkOutputVarsUsed (toVarList vars) files
+                                            if outputVarsValid then putStr ("") else putStr (show outputVarsValid)
+                                            let outputVarsUnique = checkOutputVarsUnique (toVarList vars)
+                                            if outputVarsUnique then putStr ("") else putStr (show outputVarsUnique)
+                                            let varsUnique = checkVarsUnique files
+                                            if varsUnique then putStr ("") else putStr (show varsUnique)
+                                          
+                                            dat <- mapM getDataFromFile files --get list of [[var, [column]]] i.e files
+                                            let ordered = [ orderByRow d | d <- dat, d /= [] ]
+                                            let perm = permuteOutputRows ordered
+                                            let filtered = recursivelyFilter conds perm
+                                            let matched = removeCols (matchCols vars (fst filtered)) filtered
+                                            let swapped = swap (toVarList vars) (fst matched) (snd matched)
+                                            let sorted = sort swapped
+                                            return sorted
+                                          
+--Data Processing functions 
 
 --returns all permutations of multiple rows of files joined together
+recursivelyFilter :: [(Vars, Vars)] -> ([String], [[String]]) -> ([String], [[String]])
+recursivelyFilter [] dat = dat
+recursivelyFilter (x:xs) dat = recursivelyFilter xs (filterWhere x dat) 
+
+filterWhere :: (Vars, Vars) -> ([String], [[String]]) -> ([String], [[String]])
+filterWhere ((Var v1), (Var v2)) (vars, dat) = (vars, [ row | row <- dat, (row !! i) == (row !! j)])
+ where (i,j) = getIndicies v1 v2 vars
+ 
+getIndicies :: String -> String -> [String] -> (Int, Int)
+getIndicies v1 v2 vars | (length is) == 2 = ((is !! 0), (is !! 1))
+                       | otherwise = ((is !! 0), (is !! 0))
+ where is = [ i | (i,v) <- zip [0..] vars, (v == v1 || v == v2)] 
+
+--find which columns to keep 
+matchCols :: Vars -> [String] -> [Int]
+matchCols (Vars v_out) v_dat = [ i | (i,v) <- zip [0..] v_dat, elem v v_out]
+ 
+removeCols :: [Int] -> ([String],[[String]]) -> ([String],[[String]])
+removeCols indicies (vars, dat) = ((getDataFromRow vars indicies), [ getDataFromRow row indicies | row <- dat]) 
+
+getDataFromRow :: [String] -> [Int] -> [String]
+getDataFromRow row indicies = [ row !! i | i <- indicies]
+ 
 permuteOutputRows :: [([String], [[String]])] -> ([String],[[String]])
 permuteOutputRows dat = foldr1 foldPermute dat
 
@@ -53,11 +97,31 @@ matchVars :: Vars -> [(String, [String])] -> [(String,[String])]
 matchVars vars dat = [(var_file, d) | var_output <- varList, (var_file, d) <- dat, var_output == var_file]          
  where varList = toVarList vars 
 
+ 
+--error handling functions
+checkVarsUnique :: [(Vars, String)] -> Bool
+checkVarsUnique files | valid = True
+                      | otherwise = error "Runtime error: You cannot use the same variable name more than once when TAKING from files"
+ where valid = not (containsDuplicates (checkVarsUnique' files) [])
+
+checkVarsUnique' :: [(Vars, String)] -> [String]
+checkVarsUnique' [] = []
+checkVarsUnique' ((Vars vars, file):xs) = vars ++ checkVarsUnique' xs
+
+containsDuplicates :: [String] -> [String] -> Bool
+containsDuplicates [] _ = False
+containsDuplicates (x:xs) alreadyUsed | elem x alreadyUsed = True
+                                      | otherwise = containsDuplicates xs (alreadyUsed ++ [x])
+ 
 checkOutputVarsUsed :: [String] -> [(Vars, String)] -> Bool
 checkOutputVarsUsed vars dat | valid = True
                              | otherwise = error "Runtime error: You have tried to output a variable which has not been taken from a file"
  where valid = and [ or [ elem v (toVarList file_vars) | (file_vars, filePath) <- dat] | v <- vars ]  
 
+checkOutputVarsUnique :: [String] -> Bool
+checkOutputVarsUnique vars | valid = True
+                           | otherwise = error "Runtime error: You have tried to output the same variable more than once"
+ where valid = not (containsDuplicates vars [])
 --finds which variables have been swapped form the first two list of strings
 --then swaps the respective strings in the given list of lists
 --e.g. swap ["x1", "x2"] ["x2", "x1"] [["a", "b"],["c","d"]]
